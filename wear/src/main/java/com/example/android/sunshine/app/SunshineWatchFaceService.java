@@ -36,6 +36,9 @@ import android.view.SurfaceHolder;
 import android.view.WindowInsets;
 
 import java.lang.ref.WeakReference;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
@@ -88,6 +91,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         boolean mRegisteredTimeZoneReceiver = false;
         Paint mBackgroundPaint;
         Paint mTextPaint;
+        Paint mTextDatePaint;
         boolean mAmbient;
         Time mTime;
         final BroadcastReceiver mTimeZoneReceiver = new BroadcastReceiver() {
@@ -99,8 +103,8 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         };
         int mTapCount;
 
-        float mXOffset;
-        float mYOffset;
+        float mXOffset, mXDateOffset;
+        float mYOffset, mYDateOffset;
 
         /**
          * Whether the display supports fewer bits for each color in ambient mode. When true, we
@@ -120,12 +124,16 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
                     .build());
             Resources resources = SunshineWatchFaceService.this.getResources();
             mYOffset = resources.getDimension(R.dimen.digital_y_offset);
+            mYDateOffset = resources.getDimension(R.dimen.digital_y_date_offset);
 
             mBackgroundPaint = new Paint();
-            mBackgroundPaint.setColor(resources.getColor(R.color.background));
+            mBackgroundPaint.setColor(resources.getColor(R.color.blue));
 
             mTextPaint = new Paint();
-            mTextPaint = createTextPaint(resources.getColor(R.color.digital_text));
+            mTextPaint = createTextPaint(resources.getColor(R.color.white));
+
+            mTextDatePaint = new Paint();
+            mTextDatePaint = createTextPaint(resources.getColor(R.color.white));
 
             mTime = new Time();
         }
@@ -189,10 +197,16 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             boolean isRound = insets.isRound();
             mXOffset = resources.getDimension(isRound
                     ? R.dimen.digital_x_offset_round : R.dimen.digital_x_offset);
+            mXDateOffset = resources.getDimension(isRound
+                    ? R.dimen.digital_x_date_offset_round : R.dimen.digital_x_date_offset);
+
             float textSize = resources.getDimension(isRound
                     ? R.dimen.digital_text_size_round : R.dimen.digital_text_size);
+            float textDateSize = resources.getDimension(isRound
+                    ? R.dimen.secondary_digital_text_size_round: R.dimen.secondary_digital_text_size);
 
             mTextPaint.setTextSize(textSize);
+            mTextDatePaint.setTextSize(textDateSize);
         }
 
         @Override
@@ -258,10 +272,10 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
 
             // Draw H:MM in ambient mode or H:MM:SS in interactive mode.
             mTime.setToNow();
-            String text = mAmbient
-                    ? String.format("%d:%02d", mTime.hour, mTime.minute)
-                    : String.format("%d:%02d:%02d", mTime.hour, mTime.minute, mTime.second);
+            String text = String.format("%d:%02d", mTime.hour, mTime.minute);
             canvas.drawText(text, mXOffset, mYOffset, mTextPaint);
+            String date = currentDate();
+            canvas.drawText(date, mXDateOffset, mYDateOffset, mTextDatePaint);
         }
 
         /**
@@ -294,6 +308,15 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
                         - (timeMs % INTERACTIVE_UPDATE_RATE_MS);
                 mUpdateTimeHandler.sendEmptyMessageDelayed(MSG_UPDATE_TIME, delayMs);
             }
+        }
+
+        private String currentDate() {
+            return getMonth();
+        }
+
+        private String getMonth() {
+            return new SimpleDateFormat(getString(R.string.month_format))
+                    .format(new Date(mTime.year, mTime.month, mTime.monthDay)).toUpperCase();
         }
     }
 }
