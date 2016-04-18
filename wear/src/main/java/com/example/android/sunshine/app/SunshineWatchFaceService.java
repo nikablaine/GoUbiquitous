@@ -38,7 +38,7 @@ import android.view.WindowInsets;
 import java.lang.ref.WeakReference;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
-import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
@@ -103,8 +103,8 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         };
         int mTapCount;
 
-        float mXOffset, mXDateOffset;
-        float mYOffset, mYDateOffset;
+        float mYOffset, mYDateOffset, mYDividerOffset;
+        float mDividerLength;
 
         /**
          * Whether the display supports fewer bits for each color in ambient mode. When true, we
@@ -125,6 +125,8 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             Resources resources = SunshineWatchFaceService.this.getResources();
             mYOffset = resources.getDimension(R.dimen.digital_y_offset);
             mYDateOffset = resources.getDimension(R.dimen.digital_y_date_offset);
+            mYDividerOffset = resources.getDimension(R.dimen.digital_y_divider_offset);
+            mDividerLength = resources.getDimension(R.dimen.digital_divider_length);
 
             mBackgroundPaint = new Paint();
             mBackgroundPaint.setColor(resources.getColor(R.color.blue));
@@ -133,7 +135,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             mTextPaint = createTextPaint(resources.getColor(R.color.white));
 
             mTextDatePaint = new Paint();
-            mTextDatePaint = createTextPaint(resources.getColor(R.color.white));
+            mTextDatePaint = createTextPaint(resources.getColor(R.color.light_grey));
 
             mTime = new Time();
         }
@@ -195,10 +197,6 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             // Load resources that have alternate values for round watches.
             Resources resources = SunshineWatchFaceService.this.getResources();
             boolean isRound = insets.isRound();
-            mXOffset = resources.getDimension(isRound
-                    ? R.dimen.digital_x_offset_round : R.dimen.digital_x_offset);
-            mXDateOffset = resources.getDimension(isRound
-                    ? R.dimen.digital_x_date_offset_round : R.dimen.digital_x_date_offset);
 
             float textSize = resources.getDimension(isRound
                     ? R.dimen.digital_text_size_round : R.dimen.digital_text_size);
@@ -273,9 +271,12 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             // Draw H:MM in ambient mode or H:MM:SS in interactive mode.
             mTime.setToNow();
             String text = String.format("%d:%02d", mTime.hour, mTime.minute);
-            canvas.drawText(text, mXOffset, mYOffset, mTextPaint);
+            float xTimeOffset = bounds.centerX() - mTextPaint.measureText(text) / 2;
+            canvas.drawText(text, xTimeOffset, mYOffset, mTextPaint);
             String date = currentDate();
-            canvas.drawText(date, mXDateOffset, mYDateOffset, mTextDatePaint);
+            float xDateOffset = bounds.centerX() - mTextDatePaint.measureText(date) / 2;
+            canvas.drawText(date, xDateOffset, mYDateOffset, mTextDatePaint);
+            canvas.drawLine(bounds.centerX() - mDividerLength, mYDividerOffset, bounds.centerX() + mDividerLength, mYDividerOffset, mTextPaint);
         }
 
         /**
@@ -311,12 +312,23 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         }
 
         private String currentDate() {
-            return getMonth();
+            return getDay() + ", " + getMonth() + " " + mTime.monthDay + " " + mTime.year;
         }
 
         private String getMonth() {
+            Calendar cal = GregorianCalendar.getInstance();
+            cal.set(mTime.year, mTime.month, mTime.monthDay);
             return new SimpleDateFormat(getString(R.string.month_format))
-                    .format(new Date(mTime.year, mTime.month, mTime.monthDay)).toUpperCase();
+                    .format(cal.getTime())
+                    .toUpperCase();
+        }
+
+        private String getDay() {
+            Calendar cal = GregorianCalendar.getInstance();
+            cal.set(mTime.year, mTime.month, mTime.monthDay);
+            return new SimpleDateFormat("EEE")
+                    .format(cal.getTime())
+                    .toUpperCase();
         }
     }
 }
