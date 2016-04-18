@@ -5,8 +5,14 @@
     <dimen name="secondary_digital_text_size">15dp</dimen>
     <dimen name="digital_text_size_round">45dp</dimen>
     <dimen name="secondary_digital_text_size_round">20dp</dimen>
+    <dimen name="temp_text_size_round">25dp</dimen>
+    <dimen name="temp_text_size">20dp</dimen>
     <dimen name="digital_y_offset">60dp</dimen>
     <dimen name="digital_y_date_offset">90dp</dimen>
     <dimen name="digital_y_divider_offset">120dp</dimen>
+    <dimen name="y_temp_offset">170dp</dimen>
+    <dimen name="pict_size">30dp</dimen>
+    <dimen name="pict_size_round">35dp</dimen>
+    <dimen name="space_after_pic">25dp</dimen>
     <dimen name="digital_divider_length">30dp</dimen>
 </resources>
