@@ -45,11 +45,14 @@ import android.view.WindowInsets;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.DataMap;
 import com.google.android.gms.wearable.DataMapItem;
+import com.google.android.gms.wearable.PutDataMapRequest;
+import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 import com.google.android.gms.wearable.WearableListenerService;
 
@@ -58,6 +61,7 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.TimeZone;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -407,7 +411,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         @Override
         public void onDataChanged(DataEventBuffer dataEventBuffer) {
             Log.d(LOG_TAG, "onDataChanged");
-            invalidate();
+
             for (DataEvent dataEvent : dataEventBuffer) {
                 if (dataEvent.getType() == DataEvent.TYPE_CHANGED) {
                     String path = dataEvent.getDataItem().getUri().getPath();
@@ -422,11 +426,35 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
                     }
                 }
             }
+
+            invalidate();
         }
+
+        public void getInfoFromDevice() {
+            Log.d(LOG_TAG,"getInfoFromDevice");
+            PutDataMapRequest putDataMapRequest = PutDataMapRequest.create(PATH);
+            putDataMapRequest.getDataMap().putString("uuid", UUID.randomUUID().toString());
+            PutDataRequest request = putDataMapRequest.asPutDataRequest();
+
+            Wearable.DataApi.putDataItem(mGoogleApiClient, request)
+                    .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+                        @Override
+                        public void onResult(DataApi.DataItemResult dataItemResult) {
+                            if (!dataItemResult.getStatus().isSuccess()) {
+                                Log.d(LOG_TAG, "Failed asking phone for weather data");
+                            } else {
+                                Log.d(LOG_TAG, "Successfully asked for weather data");
+                            }
+                        }
+                    });
+        }
+
 
         @Override
         public void onConnected(@Nullable Bundle bundle) {
+            Log.d(LOG_TAG, "onConnected()");
             Wearable.DataApi.addListener(mGoogleApiClient, Engine.this);
+            getInfoFromDevice();
         }
 
         @Override
