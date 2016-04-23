@@ -32,19 +32,26 @@ import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
 import android.text.format.Time;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.SurfaceHolder;
 import android.view.WindowInsets;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.DataMap;
 import com.google.android.gms.wearable.DataMapItem;
+import com.google.android.gms.wearable.Wearable;
+import com.google.android.gms.wearable.WearableListenerService;
 
 import java.lang.ref.WeakReference;
 import java.text.SimpleDateFormat;
@@ -72,6 +79,11 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
      */
     private static final int MSG_UPDATE_TIME = 0;
 
+    protected Bitmap mIcon;
+    protected String mTempHiText;
+    protected String mTempLoText;
+    protected float mScaleSize;
+
     @Override
     public Engine onCreateEngine() {
         return new Engine();
@@ -97,7 +109,12 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         }
     }
 
-    private class Engine extends CanvasWatchFaceService.Engine implements DataApi.DataListener {
+    private class Engine extends CanvasWatchFaceService.Engine
+            implements DataApi.DataListener,
+            GoogleApiClient.ConnectionCallbacks,
+            GoogleApiClient.OnConnectionFailedListener {
+        public static final String LOG_TAG = "Engine";
+
         final Handler mUpdateTimeHandler = new EngineHandler(this);
         boolean mRegisteredTimeZoneReceiver = false;
         Paint mBackgroundPaint;
@@ -115,15 +132,29 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         int mTapCount;
 
         float mYOffset, mYDateOffset, mYDividerOffset, mYTempOffset;
-        float mDividerLength, mScaleSize, mSpan;
+        float mDividerLength, mSpan;
 
         Bitmap mIcon;
+
+        public static final String HIGH_KEY = "high";
+        public static final String LOW_KEY = "low";
+        public static final String WEATHER_ID_KEY = "weatherId";
+        public static final String PATH = "/weather";
+
+        public static final String GRAD_STRING = "°";
 
         /**
          * Whether the display supports fewer bits for each color in ambient mode. When true, we
          * disable anti-aliasing in ambient mode.
          */
         boolean mLowBitAmbient;
+
+        GoogleApiClient mGoogleApiClient = new GoogleApiClient.Builder(SunshineWatchFaceService.this)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .addApi(Wearable.API)
+                .build();
+
 
         @Override
         public void onCreate(SurfaceHolder holder) {
@@ -300,30 +331,24 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             canvas.drawText(date, xDateOffset, mYDateOffset, mTextDatePaint);
             canvas.drawLine(centerX - mDividerLength, mYDividerOffset, centerX + mDividerLength, mYDividerOffset, mTextPaint);
 
-            String tempHiText = "25° ";
-            String tempLoText = "16°";
-
-            float textTempHiLength = mTextTempHiPaint.measureText(tempHiText);
-            float textTempLoLength = mTextTempLoPaint.measureText(tempLoText);
+            float textTempHiLength = mTempHiText == null ? 0f : mTextTempHiPaint.measureText(mTempHiText);
+            float textTempLoLength = mTempLoText == null ? 0f : mTextTempLoPaint.measureText(mTempLoText);
 
             if (mAmbient) {
-                float tempTextLength = textTempHiLength + textTempLoLength ;
+                float tempTextLength = textTempHiLength + textTempLoLength;
                 float xTempHiOffset = centerX - tempTextLength / 2;
-                canvas.drawText(tempHiText, xTempHiOffset, mYTempOffset, mTextTempHiPaint);
-                canvas.drawText(tempLoText, xTempHiOffset + textTempHiLength, mYTempOffset, mTextTempLoPaint);
+                canvas.drawText(mTempHiText == null ? "" : mTempHiText, xTempHiOffset, mYTempOffset, mTextTempHiPaint);
+                canvas.drawText(mTempLoText == null ? "" : mTempLoText, xTempHiOffset + textTempHiLength, mYTempOffset, mTextTempLoPaint);
             } else {
-                if (mIcon == null) {
-                    BitmapDrawable drawable = (BitmapDrawable) getResources().getDrawable(R.drawable.art_clear);
-                    Bitmap bitmap = drawable.getBitmap();
-                    mIcon = Bitmap.createScaledBitmap(bitmap, dp2px(mScaleSize), dp2px(mScaleSize), true);
-                }
                 float tempLineLength = textTempHiLength + textTempLoLength + dp2px(mScaleSize) + dp2px(mSpan);
                 float xBitmapOffset = centerX - tempLineLength / 2;
                 float xTempHiOffset = xBitmapOffset + mScaleSize + mSpan;
                 float topBitmap = mYTempOffset - mTextTempHiPaint.getTextSize() / 2 - dp2px(mScaleSize) / 2;
-                canvas.drawBitmap(mIcon, xBitmapOffset, topBitmap, null);
-                canvas.drawText(tempHiText, xTempHiOffset, mYTempOffset, mTextTempHiPaint);
-                canvas.drawText(tempLoText, xTempHiOffset + textTempHiLength, mYTempOffset, mTextTempLoPaint);
+                if (mIcon != null) {
+                    canvas.drawBitmap(mIcon, xBitmapOffset, topBitmap, null);
+                }
+                canvas.drawText(String.valueOf(mTempHiText), xTempHiOffset, mYTempOffset, mTextTempHiPaint);
+                canvas.drawText(String.valueOf(mTempLoText), xTempHiOffset + textTempHiLength, mYTempOffset, mTextTempLoPaint);
             }
         }
 
@@ -379,19 +404,45 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
                     .toUpperCase();
         }
 
-        private int dp2px(float dipValue) {
-            DisplayMetrics metrics = getResources().getDisplayMetrics();
-            return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dipValue, metrics);
-        }
-
         @Override
         public void onDataChanged(DataEventBuffer dataEventBuffer) {
-            for (DataEvent dataEvent :dataEventBuffer) {
+            Log.d(LOG_TAG, "onDataChanged");
+            invalidate();
+            for (DataEvent dataEvent : dataEventBuffer) {
                 if (dataEvent.getType() == DataEvent.TYPE_CHANGED) {
-                    DataMap dataMap = DataMapItem.fromDataItem(dataEvent.getDataItem()).getDataMap();
-                    // TODO: fill in the data
+                    String path = dataEvent.getDataItem().getUri().getPath();
+                    if (path.equals(PATH)) {
+                        DataMap dataMap = DataMapItem.fromDataItem(dataEvent.getDataItem()).getDataMap();
+                        mTempHiText = String.valueOf(dataMap.getInt(HIGH_KEY)) + GRAD_STRING;
+                        mTempLoText = String.valueOf(dataMap.getInt(LOW_KEY)) + GRAD_STRING;
+                        int weatherId = dataMap.getInt(WEATHER_ID_KEY);
+                        BitmapDrawable drawable = (BitmapDrawable) getResources().getDrawable(weatherId);
+                        Bitmap bitmap = drawable.getBitmap();
+                        mIcon = Bitmap.createScaledBitmap(bitmap, dp2px(mScaleSize), dp2px(mScaleSize), true);
+                    }
                 }
             }
         }
+
+        @Override
+        public void onConnected(@Nullable Bundle bundle) {
+            Wearable.DataApi.addListener(mGoogleApiClient, Engine.this);
+        }
+
+        @Override
+        public void onConnectionSuspended(int i) {
+
+        }
+
+        @Override
+        public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+
+        }
+
+    }
+
+    private int dp2px(float dipValue) {
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dipValue, metrics);
     }
 }
