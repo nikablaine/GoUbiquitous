@@ -187,6 +187,8 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             mTextTempLoPaint = createTextPaint(resources.getColor(R.color.light_grey));
 
             mTime = new Time();
+
+            mGoogleApiClient.connect();
         }
 
         @Override
@@ -420,9 +422,13 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
                         mTempHiText = String.valueOf(dataMap.getInt(HIGH_KEY)) + GRAD_STRING;
                         mTempLoText = String.valueOf(dataMap.getInt(LOW_KEY)) + GRAD_STRING;
                         int weatherId = dataMap.getInt(WEATHER_ID_KEY);
-                        BitmapDrawable drawable = (BitmapDrawable) getResources().getDrawable(weatherId);
-                        Bitmap bitmap = drawable.getBitmap();
-                        mIcon = Bitmap.createScaledBitmap(bitmap, dp2px(mScaleSize), dp2px(mScaleSize), true);
+                        // Log.d(LOG_TAG, "weatherId=" + weatherId);
+                        if (weatherId != 0) {
+                            BitmapDrawable drawable = (BitmapDrawable) getResources().getDrawable(
+                                    Utility.getResourceForWeatherCondition(getApplicationContext(), weatherId));
+                            Bitmap bitmap = drawable.getBitmap();
+                            mIcon = Bitmap.createScaledBitmap(bitmap, dp2px(mScaleSize), dp2px(mScaleSize), true);
+                        }
                     }
                 }
             }
